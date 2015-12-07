@@ -13,7 +13,7 @@
 /*************************************************************************/
 GenAlgo::GenAlgo()
 {	
-	srand((unsigned int)time(NULL));	// initialize random seed
+	srand((unsigned int)time(NULL));	// initialize random seed	
 
 	Minimizing_prob = false;
 
@@ -55,7 +55,23 @@ GenAlgo::~GenAlgo()
 			{
 				delete[] Temp_popu[i].fChromo;
 				Temp_popu[i].fChromo = NULL;
-			}		
+			}
+
+			if (Pb[i].fChromo)
+			{
+				delete[] Pb[i].fChromo;
+				Pb[i].fChromo = NULL;
+			}
+			if (Pxb[i].fChromo)
+			{
+				delete[] Pxb[i].fChromo;
+				Pxb[i].fChromo = NULL;
+			}
+			if (Pe[i].fChromo)
+			{
+				delete[] Pe[i].fChromo;
+				Pe[i].fChromo = NULL;
+			}
 	}
 	
 	if (POPU) 
@@ -74,6 +90,26 @@ GenAlgo::~GenAlgo()
 		delete[] best_fitness_array;
 		best_fitness_array = NULL;
 	}
+	if (Pb)
+	{
+		delete[] Pb;
+		Pb = NULL;
+	}
+	if (Pxb)
+	{
+		delete[] Pxb;
+		Pxb = NULL;
+	} 
+	if (Pe)
+	{
+		delete[] Pe;
+		Pe = NULL;
+	}
+	if (Xi)
+	{
+		delete[] Xi;
+		Xi = NULL;
+	}
 }
 
 /*************************************************************************/
@@ -89,7 +125,7 @@ GenAlgo::~GenAlgo()
 bool GenAlgo::InputParams()
 {
 	/*std::cout << "\nHow many generations ? ------------- : ";*/
-	nGEN = 100;
+	nGEN = 51;
 	//std::cin >> nGEN;
 
 	
@@ -108,7 +144,7 @@ bool GenAlgo::InputParams()
 	//std::cout << "\nMutation Probability ? ( 0 to 1 ) -- : ";	
 	////std::cin >> Pm;
 	//std::cout << "\nNumber of variables (Maximum %d) ---- : " << MAXVECSIZE;
-	nVAR = 2;
+	nVAR = 10;
 	//std::cin >> nVAR;
 
 	LW_BND = new float[nVAR];
@@ -158,22 +194,36 @@ bool GenAlgo::Initialize()
 	for (int k = 0; k < nVAR; k++)	lenChromo_tot += lenChromo_var[k];
 	
 	MaxFitness_Calculations = 10000 * nVAR;		//According to CEC 2013 benchmark.
-
+	
 	POPU = new INDIVIDUAL[nPOPU];	
 	Temp_popu = new INDIVIDUAL[nPOPU];
 
 	best_fitness_array = new Fitness[nGEN];
+
+	T = (int)(nGEN * 0.2);
+	D = (int)(nGEN * 0.1);
+	
+	//Initializing tables
+	Pb = new INDIVIDUAL[T];
+	Pxb = new INDIVIDUAL[T];
+	Pe = new INDIVIDUAL[D];
+
+	Xi = new Fitness[nVAR];
 
 	for (i = 0; i < nPOPU; i++)
 	{
 		POPU[i].fChromo = new char[lenChromo_tot];
 		Temp_popu[i].fChromo = new char[lenChromo_tot];
 
+		Pb[i].fChromo = new char[lenChromo_tot];
+		Pxb[i].fChromo = new char[lenChromo_tot];
+		Pe[i].fChromo = new char[lenChromo_tot];
+
 		for (j = 0; j < lenChromo_tot; j++)
 		{
 			POPU[i].fChromo[j] = (rand() % 2) ;   // randomly initialises the chorosome string (mod2 random number generation)
 		}	
-
+		
 		POPU[i].fFitness = CalculateFitness(POPU[i]);	//calculates the fittness level.
 	}
 
@@ -192,13 +242,19 @@ bool GenAlgo::Initialize()
 /// \remarks	This function randomly selects two different parents from the population
 ///             and stores their locations in indx_m and indx_f respectively.
 /*************************************************************************/
-bool GenAlgo::GetParents(int *indx_f, int *indx_m)
+bool GenAlgo::GetParents(int *indx_f, int *indx_m , const bool itsTime)
 {
-	*indx_f = RANDOM(0, nPOPU - 1);
+	if (itsTime) *indx_m = RANDOM(0, (T + D) - 1);
+	else   *indx_m = RANDOM(0, nPOPU - 1);
+
 	while (1)
 	{
-		*indx_m = RANDOM(0, nPOPU - 1);
-		if (*indx_f != *indx_m)	break;
+		*indx_f = RANDOM(0, nPOPU - 1);
+		if (!itsTime)
+		{
+			if (*indx_f != *indx_m)	break;
+		}
+		else break;
 	}
 	return SUCCESS;
 }
@@ -214,7 +270,7 @@ bool GenAlgo::GetParents(int *indx_f, int *indx_m)
 ///				selecting a crossover point and then merging the parents w.r.t the selected point.
 /*************************************************************************/
 bool GenAlgo::CreateChildren(INDIVIDUAL & child1, INDIVIDUAL & child2,
-							const int *indx_f, const int *indx_m)
+							const int *indx_f, const int *indx_m , const bool itsTime)
 {
 	int crossPoint = 0,
 		i;
@@ -222,17 +278,42 @@ bool GenAlgo::CreateChildren(INDIVIDUAL & child1, INDIVIDUAL & child2,
 	crossPoint = RANDOM(0, lenChromo_tot - 1);	
 
 	//CrossOver and create children
-	for (i = 0; i <= crossPoint; i++)
-	{		
-		child1.fChromo[i] = POPU[*indx_f].fChromo[i];
-		child2.fChromo[i] = POPU[*indx_m].fChromo[i];		
-	}
-	for (i = crossPoint + 1; i < lenChromo_tot; i++)
+	if (itsTime)
 	{
-		child1.fChromo[i] = POPU[*indx_m].fChromo[i];
-		child2.fChromo[i] = POPU[*indx_f].fChromo[i];
+		int indx_tables = RANDOM(0, (T+D - 1));
+
+		const char *fChromo_table;
+		fChromo_table = (indx_tables > T) ? Pxb[indx_tables].fChromo : Pe[indx_tables - T].fChromo;
+
+#if One_Point_Crossover 
+		for (i = 0; i <= crossPoint; i++)
+		{
+			child1.fChromo[i] = POPU[*indx_f].fChromo[i];
+			child2.fChromo[i] = fChromo_table[i];
+		}
+		for (i = crossPoint + 1; i < lenChromo_tot; i++)
+		{
+			child1.fChromo[i] = fChromo_table[i];
+			child2.fChromo[i] = POPU[*indx_f].fChromo[i];
+		}
+#endif
 	}
-	
+	else
+	{
+#if One_Point_Crossover 
+		for (i = 0; i <= crossPoint; i++)
+		{
+			child1.fChromo[i] = POPU[*indx_f].fChromo[i];
+			child2.fChromo[i] = POPU[*indx_m].fChromo[i];
+		}
+		for (i = crossPoint + 1; i < lenChromo_tot; i++)
+		{
+			child1.fChromo[i] = POPU[*indx_m].fChromo[i];
+			child2.fChromo[i] = POPU[*indx_f].fChromo[i];
+		}
+	}
+#endif
+
 	return SUCCESS;
 	
 }
@@ -244,16 +325,16 @@ bool GenAlgo::CreateChildren(INDIVIDUAL & child1, INDIVIDUAL & child2,
 ///
 /// \return		Returns True\False
 ///
-/// \remarks	This function first verifies if the child is to be mutated by choosing a random mod2 number the
+/// \remarks	This function /*first verifies if the child is to be mutated by choosing a random mod2 number then*/
 ///				randomly selects a mutation point and flips the value at that position.
 /*************************************************************************/
 bool GenAlgo::MutateChildren(INDIVIDUAL & child)
 {
 	int mutationPoint = 0;
 	//	i;
-	bool bmutate;			//decides if the child should be mutated
+	bool bmutate = true;			//decides if the child should be mutated
 
-	bmutate = (rand() % 2) ? true : false;	//mod2 random number generation
+	//bmutate = (rand() % 2) ? true : false;	//mod2 random number generation
 
 	if (bmutate)
 	{
@@ -278,37 +359,52 @@ bool GenAlgo::MutateChildren(INDIVIDUAL & child)
 bool GenAlgo::IdentifyChilds(INDIVIDUAL const & child1, INDIVIDUAL const & child2,
 							 const int indx_f, const int indx_m, int const indx)
 {
+	int i;
 	/*For Child 1*/
-	if ((child1.fFitness >= POPU[indx_f].fFitness) || (child1.fFitness >= POPU[indx_m].fFitness))
+	if (BetterFit(child1.fFitness, POPU[indx_f].fFitness) || BetterFit(child1.fFitness , POPU[indx_m].fFitness))
 	{
-		for (int i = 0; i < lenChromo_tot; i++)
+		for (i = 0; i < lenChromo_tot; i++)
 			Temp_popu[indx].fChromo[i] = child1.fChromo[i];
 
 		Temp_popu[indx].fFitness = child1.fFitness;
 	}
-	else if ((POPU[indx_f].fFitness >= POPU[indx_m].fFitness))
+	else if (BetterFit(POPU[indx_f].fFitness, POPU[indx_m].fFitness))
 	{
-		for (int i = 0; i < lenChromo_tot; i++)
+		for (i = 0; i < lenChromo_tot; i++)
 			Temp_popu[indx].fChromo[i] = POPU[indx_f].fChromo[i];
 
 		Temp_popu[indx].fFitness = POPU[indx_f].fFitness;
 	}
-		
+	else
+	{
+		for (i = 0; i < lenChromo_tot; i++)
+			Temp_popu[indx].fChromo[i] = POPU[indx_m].fChromo[i];
+
+		Temp_popu[indx].fFitness = POPU[indx_m].fFitness;
+	}	
+	
 
 	/*For Child 2*/
-	if ((child2.fFitness >= POPU[indx_f].fFitness) || (child2.fFitness >= POPU[indx_m].fFitness))
+	if (BetterFit(child2.fFitness, POPU[indx_f].fFitness) || BetterFit(child2.fFitness , POPU[indx_m].fFitness))
 	{
-		for (int i = 0; i < lenChromo_tot; i++)
+		for (i = 0; i < lenChromo_tot; i++)
 			Temp_popu[indx + 1].fChromo[i] = child2.fChromo[i];
 
 		Temp_popu[indx + 1].fFitness = child2.fFitness;
 	}
-	else if ((POPU[indx_m].fFitness >= POPU[indx_f].fFitness))
+	else if (BetterFit(POPU[indx_m].fFitness , POPU[indx_f].fFitness))
 	{
-		for (int i = 0; i < lenChromo_tot; i++)
+		for (i = 0; i < lenChromo_tot; i++)
 			Temp_popu[indx + 1].fChromo[i] = POPU[indx_m].fChromo[i];
 
 		Temp_popu[indx + 1].fFitness = POPU[indx_m].fFitness;
+	}
+	else
+	{
+		for (i = 0; i < lenChromo_tot; i++)
+			Temp_popu[indx + 1].fChromo[i] = POPU[indx_f].fChromo[i];
+
+		Temp_popu[indx + 1].fFitness = POPU[indx_f].fFitness;
 	}
 
 	return SUCCESS;
@@ -339,12 +435,137 @@ bool GenAlgo::CopyPopulation(int gen_no)
 		POPU[i].fFitness = Temp_popu[i].fFitness;	//copies the fittness level.
 	}
 
-	/*Stores the best fitness level achieved in this generation in best_fitness_array[].*/
+	/*Stores the best fitness level achieved in this generation in best_fitness_array[]. */	  
 	for (int i = 0; i < nPOPU; i++)
-	{
-		if (POPU[i].fFitness > POPU[max_fit_indx].fFitness)	max_fit_indx = i;
+	{		
+		if (BetterFit(POPU[i].fFitness , POPU[max_fit_indx].fFitness))	max_fit_indx = i;
 	}
 	best_fitness_array[gen_no] = POPU[max_fit_indx].fFitness;
+	
+	return SUCCESS;
+}
+
+/*************************************************************************/
+/// <b>Function: PopulateTables</b>
+///
+/// \param  
+///
+/// \return		Returns True\False
+///
+/// \remarks	Populates the tables.
+/*************************************************************************/
+bool GenAlgo::PopulateTables(int indx)
+{
+	int idx_Pb = 0;				//Stores the current best candidate indx
+	float maxFittness = POPU[0].fFitness;
+
+	/*Populating Pb start*/
+	for (int i = 0; i < nPOPU; i++)
+	{
+		if (BetterFit(POPU[i].fFitness , maxFittness))	idx_Pb = i;
+	}
+
+	for (int j = 0; j < lenChromo_tot; j++)
+	{
+		Pb[(indx % T)].fChromo[j] = POPU[idx_Pb].fChromo[j];   // copies the chromosome string to Pb and discards the oldest if indx > T-1 .
+	}
+	Pb[(indx % T)].fFitness = POPU[idx_Pb].fFitness;
+	/*Populating Pb end*/
+
+	/*Populating Pxb start*/
+	//Right now Pxb is selected dicrectly by coping a randomly selected individual from Pb
+	if (indx >= T)
+	{	
+		int indx_Pxb = RANDOM(0 , T-1);
+		for (int j = 0; j < lenChromo_tot; j++)
+		{
+			Pxb[(indx % T)].fChromo[j] = Pb[indx_Pxb].fChromo[j];   // copies the chromosome string to Pe and discards the oldest if indx > D-1 .
+		}
+		Pxb[(indx % T)].fFitness = Pb[indx_Pxb].fFitness;
+	}
+	/*Populating Pxb end*/
+
+	/*Populating Pe start*/
+	int indx_Pe = FindLeastCorrelatedCandidate(idx_Pb);
+	for (int j = 0; j < lenChromo_tot; j++)
+	{
+		Pe[(indx % D)].fChromo[j] = POPU[indx_Pe].fChromo[j];   // copies the chromosome string to Pe and discards the oldest if indx > D-1 .
+	}
+	Pe[(indx % D)].fFitness = POPU[indx_Pe].fFitness;
+	/*Populating Pe end*/
+
+	/*Populating Xi start*/	
+	for (int j = 0; j < nVAR; j++)
+	{
+		Xi[j] = 0.50;   // Initially Xi is set ro 0.5. i.e every variable is equally important.
+	}	
+	/*Populating Xi end*/
+
+	return SUCCESS;
+}
+
+/*************************************************************************/
+/// <b>Function: FindLeastCorrelatedCandidate</b>
+///
+/// \param  
+///
+/// \return		Returns True\False
+///
+/// \remarks	Finds the least correlated candidate w.r.t the current best candidate, whose fitness is above avg.
+/*************************************************************************/
+int GenAlgo::FindLeastCorrelatedCandidate(const int idx_Pb)
+{
+	float corr_min = 1, corr;			//Stores the minimum corr. coeff. found
+	int indx = idx_Pb;					//Stores the index of the minimum corr. coeff. found
+
+	for (int i = 0; i < nPOPU; i++)
+		{
+
+		if (BetterFit(POPU[i].fFitness , avgRunningFITNESS) && (i != idx_Pb))
+			{
+				corr = CalCorrelationCoff(POPU[idx_Pb], POPU[i]);
+				if (corr < corr_min)
+				{
+					corr_min = corr;
+					indx = i;
+				}
+			}
+		}
+
+	return indx;
+}
+
+/*************************************************************************/
+/// <b>Function: CalCorrelationCoff</b>
+///
+/// \param  
+///
+/// \return		Returns True\False
+///
+/// \remarks	Copies population from temp population to new population.
+/*************************************************************************/
+float GenAlgo::CalCorrelationCoff(INDIVIDUAL const & indv_main, INDIVIDUAL const & indv_obj)
+{
+	double corr = 0.0 , diff = 0 , norm_diff , norm_diff_fitness , factor;
+
+	norm_diff_fitness = mod(indv_main.fFitness - indv_obj.fFitness);		//though it is always greater than 1
+	norm_diff_fitness /= avgRunningFITNESS;
+	
+	for (int i = 0; i < nVAR; i++)
+	{
+		/*Calcualting Correlation Coefficient*/
+		diff = (DecodeString(indv_main.fChromo, i) - DecodeString(indv_obj.fChromo, i));
+		corr = Xi[i] * square(diff);  // copies the chromosome string from temp population to new population.
+		
+		corr = sqrt(corr);
+
+		/*Updating Xi table*/	
+		norm_diff = diff / (HG_BND[i] - LW_BND[i]);
+		factor = norm_diff / norm_diff_fitness;
+
+		if (factor > 1)	Xi[i] += ((1 - Xi[i]) / 2);
+		else	Xi[i] -= (Xi[i] / 2);
+	}	
 	return SUCCESS;
 }
 
@@ -378,8 +599,6 @@ GenAlgo::Fitness GenAlgo::CalculateFitness(INDIVIDUAL const &individual)
 		delete[] x;
 		x = NULL;
 	}
-
-	rslt = (Minimizing_prob) ? (-1 * rslt) : rslt;
 
 	return rslt;
 }
@@ -460,6 +679,49 @@ int GenAlgo::largestPowerOf2(const unsigned int n)
 	//return (number >> 1) + 1;
 
 }
+/*************************************************************************/
+/// <b>Function: BetterFit</b>
+///
+/// \param  
+///
+/// \return		Returns true/false
+///
+/// \remarks	Returns the better fitt candidate. fit_target is compared with fit_base
+/*************************************************************************/
+bool GenAlgo::BetterFit(const double fit_target, const double fit_base)
+{
+	if (Minimizing_prob)
+	{
+		if (fit_target <= fit_base)	return true;
+		else return false;
+	}
+	else
+	{
+		if (fit_target >= fit_base)	return true;
+		else return false;
+	}	
+}
+
+/*************************************************************************/
+/// <b>Function: CalculateAvgFitness</b>
+///
+/// \param  
+///
+/// \return		Returns decoded string
+///
+/// \remarks	Calculates the running average of the current population
+/*************************************************************************/
+bool GenAlgo::CalculateAvgFitness()
+{
+	avgRunningFITNESS = 0;
+	for (int i = 0; i < nPOPU; i++)
+	{
+		avgRunningFITNESS += POPU[i].fFitness;
+	}
+	avgRunningFITNESS /= nPOPU;
+
+	return SUCCESS;
+}
 
 /*************************************************************************/
 /// <b>Function: Run</b>
@@ -478,7 +740,9 @@ bool GenAlgo::Run(const int func_no)
 		totGen,
 		indx_f = 0,				//Index of one parent.	
 		indx_m = 0;				//Index of another parent.
-	bool rslt;		
+	bool rslt ,
+		 itsTime = false;		//flag to indicate the start of our algo
+	
 
 	func_num = func_no;
 
@@ -501,6 +765,10 @@ bool GenAlgo::Run(const int func_no)
 
 		if (Fitness_Calculations > MaxFitness_Calculations)	break;		//Maximum number of fittness calculations has occured.
 
+		//if ((nGEN - totGen) > 2 * T)	itsTime = true;	
+
+		CalculateAvgFitness();
+
 		while ((nPopu -= 2) >= 0)
 		{
 			/*allocation memory*/
@@ -510,10 +778,10 @@ bool GenAlgo::Run(const int func_no)
 
 
 			/*SELECT PARENTS*/
-			GetParents(&indx_f, &indx_m);
+			GetParents(&indx_f, &indx_m , itsTime);
 
 			/*DO CROSSOVER*/
-			CreateChildren(child1, child2, &indx_f, &indx_m);
+			CreateChildren(child1, child2, &indx_f, &indx_m , itsTime);
 
 			/*MUTATES THE CHILDREN*/
 			MutateChildren(child1);
@@ -525,7 +793,7 @@ bool GenAlgo::Run(const int func_no)
 			Fitness_Calculations += 2;
 
 			/*IDENTIFY GOOD CHILDS AND STORE THEM*/
-			IdentifyChilds(child1, child2, indx_f, indx_m, nPopu);
+			IdentifyChilds(child1, child2, indx_f, indx_m, nPOPU - nPopu - 2);
 
 
 			/*cleaning up*/
@@ -538,8 +806,11 @@ bool GenAlgo::Run(const int func_no)
 		/*UPDATE NEW GEN POPULATION*/
 		CopyPopulation(nGEN - totGen);
 
-		std::cout << "\nGen no :: " << nGEN - totGen << std::endl;
-		std::cout << "**************" << std::endl;
+		/*POPULATE TABLES*/
+		//PopulateTables(nGEN - totGen);
+
+		/*std::cout << "\nGen no :: " << nGEN - totGen << std::endl;
+		std::cout << "**************" << std::endl;*/
 		ShowDude();
 
 	} while (--totGen);
@@ -553,6 +824,8 @@ return true;
 
 bool GenAlgo::ShowStatistics()
 {
+	mean_best_fitness = std_best_fitness = 0;
+
 	for (int j = 0; j < nGEN; j++) {
 		mean_best_fitness += best_fitness_array[j];
 	}
@@ -560,7 +833,7 @@ bool GenAlgo::ShowStatistics()
 	mean_best_fitness /= nGEN;
 
 	for (int j = 0; j < nGEN; j++) {
-		std_best_fitness += pow((mean_best_fitness - best_fitness_array[j]), 2.0);
+		std_best_fitness += square(mean_best_fitness - best_fitness_array[j]);
 	}
 
 	std_best_fitness /= nGEN;
@@ -579,6 +852,7 @@ bool GenAlgo::ShowIndividual(INDIVIDUAL const &individual)
 		std::cout << "Var " << j << " : " << DecodeString(individual.fChromo, j) << " " << std::endl;
 	}
 	std::cout << "Fittness : " << individual.fFitness << std::endl;
+	std::cout << "\n Optimum Fittness : " << optimum << std::endl;
 	return SUCCESS;
 }
 
@@ -588,9 +862,9 @@ bool GenAlgo::ShowDude()
 
 	for (int i = 0; i < nPOPU; i++)
 	{
-		if (POPU[i].fFitness > POPU[max_fit_indx].fFitness)	max_fit_indx = i;
+		if (BetterFit(POPU[i].fFitness, POPU[max_fit_indx].fFitness))	max_fit_indx = i;
 	}
-
+	
 	std::cout << "\nDude is : " << std::endl;
 	ShowIndividual(POPU[max_fit_indx]);
 	
