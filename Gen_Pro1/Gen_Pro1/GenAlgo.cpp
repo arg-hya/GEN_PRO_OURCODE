@@ -45,34 +45,40 @@ GenAlgo::~GenAlgo()
 	}
 
 	for (int i = 0; i < nPOPU; i++)
-	{		
-			if (POPU[i].fChromo)
-			{
-				delete[] POPU[i].fChromo;
-				POPU[i].fChromo = NULL;
-			}
-			if (Temp_popu[i].fChromo)
-			{
-				delete[] Temp_popu[i].fChromo;
-				Temp_popu[i].fChromo = NULL;
-			}
-
-			if (Pb[i].fChromo)
-			{
-				delete[] Pb[i].fChromo;
-				Pb[i].fChromo = NULL;
-			}
-			if (Pxb[i].fChromo)
-			{
-				delete[] Pxb[i].fChromo;
-				Pxb[i].fChromo = NULL;
-			}
-			if (Pe[i].fChromo)
-			{
-				delete[] Pe[i].fChromo;
-				Pe[i].fChromo = NULL;
-			}
+	{
+		if (POPU[i].fChromo)
+		{
+			delete[] POPU[i].fChromo;
+			POPU[i].fChromo = NULL;
+		}
+		if (Temp_popu[i].fChromo)
+		{
+			delete[] Temp_popu[i].fChromo;
+			Temp_popu[i].fChromo = NULL;
+		}
 	}
+	for (int i = 0; i < T; i++)
+	{
+		if (Pb[i].fChromo)
+		{
+			delete[] Pb[i].fChromo;
+			Pb[i].fChromo = NULL;
+		}
+		if (Pxb[i].fChromo)
+		{
+			delete[] Pxb[i].fChromo;
+			Pxb[i].fChromo = NULL;
+		}
+	}
+	for (int i = 0; i < D; i++)
+	{
+		if (Pe[i].fChromo)
+		{
+			delete[] Pe[i].fChromo;
+			Pe[i].fChromo = NULL;
+		}
+	}
+	
 	
 	if (POPU) 
 	{
@@ -214,17 +220,22 @@ bool GenAlgo::Initialize()
 	{
 		POPU[i].fChromo = new char[lenChromo_tot];
 		Temp_popu[i].fChromo = new char[lenChromo_tot];
-
-		Pb[i].fChromo = new char[lenChromo_tot];
-		Pxb[i].fChromo = new char[lenChromo_tot];
-		Pe[i].fChromo = new char[lenChromo_tot];
-
+		
 		for (j = 0; j < lenChromo_tot; j++)
 		{
 			POPU[i].fChromo[j] = (rand() % 2) ;   // randomly initialises the chorosome string (mod2 random number generation)
 		}	
 		
 		POPU[i].fFitness = CalculateFitness(POPU[i]);	//calculates the fittness level.
+	}
+	for (i = 0; i < T; i++)
+	{
+		Pb[i].fChromo = new char[lenChromo_tot];
+		Pxb[i].fChromo = new char[lenChromo_tot];
+	}
+	for (i = 0; i < D; i++)
+	{
+		Pe[i].fChromo = new char[lenChromo_tot];
 	}
 
 	return SUCCESS;
@@ -283,7 +294,7 @@ bool GenAlgo::CreateChildren(INDIVIDUAL & child1, INDIVIDUAL & child2,
 		int indx_tables = RANDOM(0, (T+D - 1));
 
 		const char *fChromo_table;
-		fChromo_table = (indx_tables > T) ? Pxb[indx_tables].fChromo : Pe[indx_tables - T].fChromo;
+		fChromo_table = (indx_tables < T) ? Pxb[indx_tables].fChromo : Pe[indx_tables - T].fChromo;
 
 #if One_Point_Crossover 
 		for (i = 0; i <= crossPoint; i++)
@@ -765,7 +776,7 @@ bool GenAlgo::Run(const int func_no)
 
 		if (Fitness_Calculations > MaxFitness_Calculations)	break;		//Maximum number of fittness calculations has occured.
 
-		//if ((nGEN - totGen) > 2 * T)	itsTime = true;	
+		if ((nGEN - totGen) > 2 * T)	itsTime = true;	
 
 		CalculateAvgFitness();
 
@@ -807,11 +818,11 @@ bool GenAlgo::Run(const int func_no)
 		CopyPopulation(nGEN - totGen);
 
 		/*POPULATE TABLES*/
-		//PopulateTables(nGEN - totGen);
+		PopulateTables(nGEN - totGen);
 
 		/*std::cout << "\nGen no :: " << nGEN - totGen << std::endl;
 		std::cout << "**************" << std::endl;*/
-		ShowDude();
+		//ShowDude();
 
 	} while (--totGen);
 

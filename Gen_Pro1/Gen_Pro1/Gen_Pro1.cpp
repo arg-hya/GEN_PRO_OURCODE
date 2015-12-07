@@ -64,7 +64,7 @@ int _tmain(int argc, _TCHAR* argv[])
 	{
 		std::cout << "************ Function number: " << i + 1 << " ************" << std::endl;
 
-		//OptimumValue(i + 1, optimum);
+		OptimumValue(i + 1, optimum);
 
 		GenAlgo *a = new GenAlgo();		
 
@@ -72,7 +72,7 @@ int _tmain(int argc, _TCHAR* argv[])
 
 		a->Minimizing_prob = true;		//Mentioning this is a minimizing prob
 
-	//	a->optimum = optimum;
+		a->optimum = optimum;
 
 		a->Run(i+1);			//Runs it
 
