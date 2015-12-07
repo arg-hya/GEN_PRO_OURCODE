@@ -45,7 +45,8 @@ private:
 	float	 *LW_BND,				//Lower Bound and Higher Bound of each variable.
 			 *HG_BND,				//Lower Bound and Higher Bound of each variable.				 
 			  Pc ,					//Cross-Over Propability.
-		      Pm ,					///Mutation Propability.			  
+		      Pm ,					//Mutation Propability.
+			  Ptb ,					//Crossover from Tables Propability.
 			  BASIC_SEED;			//basic seed for rand().
 			
 
