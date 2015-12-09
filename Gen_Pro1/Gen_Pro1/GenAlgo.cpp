@@ -256,15 +256,28 @@ bool GenAlgo::Initialize()
 /// \remarks	This function randomly selects two different parents from the population
 ///             and stores their locations in indx_m and indx_f respectively.
 /*************************************************************************/
-bool GenAlgo::GetParents(int *indx_f, int *indx_m , const bool itsTime)
+bool GenAlgo::GetParents(int *indx_f, int *indx_m , const bool itsTime , bool *cross_frm_tables)
 {
-	if (itsTime) *indx_m = RANDOM(0, (T + D) - 1);
-	else   *indx_m = RANDOM(0, nPOPU - 1);
+	double 	bCrossTables = 0.0;		//decides whether to populate from the tables
+	bCrossTables = FLOAT_RANDOM(0, 1);
+
+	if ((itsTime) && (bCrossTables <= Ptb))
+	{
+		*cross_frm_tables = true;
+		*indx_m = RANDOM(0, (T + D) - 1);
+	}
+	else
+	{
+		*cross_frm_tables = false;
+		*indx_m = RouletteWheelSelection(POPU, avgRunningFITNESS * nPOPU, 0, nPOPU - 1);		//RANDOM(0, nPOPU - 1);
+	}	
 
 	while (1)
 	{
-		*indx_f = RANDOM(0, nPOPU - 1);
-		if (!itsTime)
+		*indx_f = RouletteWheelSelection(POPU, avgRunningFITNESS * nPOPU, 0, nPOPU - 1);  //RANDOM(0, nPOPU - 1);
+		if ((!itsTime) ||
+			(false == *cross_frm_tables)
+			)
 		{
 			if (*indx_f != *indx_m)	break;
 		}
@@ -284,22 +297,20 @@ bool GenAlgo::GetParents(int *indx_f, int *indx_m , const bool itsTime)
 ///				selecting a crossover point and then merging the parents w.r.t the selected point.
 /*************************************************************************/
 bool GenAlgo::CreateChildren(INDIVIDUAL & child1, INDIVIDUAL & child2,
-							const int *indx_f, const int *indx_m , const bool itsTime)
+			  const int *indx_f, const int *indx_m, const bool itsTime, bool *cross_frm_tables)
 {
 	int crossPoint = 0,
 		i;
-	double bCrossover = 0.0,		//decides if crossover should take place
-		   bCrossTables = 0.0;		//decides whether to populate from the tables
+	double bCrossover = 0.0;		//decides if crossover should take place	   
 	
-	bCrossover = FLOAT_RANDOM(0, 1);   //rand() % 2  ;	//mod2 random number generation
-	bCrossTables = FLOAT_RANDOM(0, 1);
+	bCrossover = FLOAT_RANDOM(0, 1);   //rand() % 2  ;	//mod2 random number generation	
 
 	crossPoint = RANDOM(0, lenChromo_tot - 1);	
 	 
 	if (bCrossover <= Pc)
 	{
 		//CrossOver and create children
-		if ((itsTime) && (bCrossTables <= Ptb))
+		if ((itsTime) && cross_frm_tables)
 		{			
 				int indx_tables = RANDOM(0, (T + D - 1));
 
@@ -744,7 +755,7 @@ bool GenAlgo::BetterFit(const double fit_target, const double fit_base)
 ///
 /// \return		Returns decoded string
 ///
-/// \remarks	Calculates the running average of the current population
+/// \remarks	Calculates the running average of the current population.
 /*************************************************************************/
 bool GenAlgo::CalculateAvgFitness()
 {
@@ -756,6 +767,32 @@ bool GenAlgo::CalculateAvgFitness()
 	avgRunningFITNESS /= nPOPU;
 
 	return SUCCESS;
+}
+
+/*************************************************************************/
+/// <b>Function: RouletteWheelSelection</b>
+///
+/// \param  
+///
+/// \return		Returns decoded string
+///
+/// \remarks	Calculates the running average of the current population.
+/*************************************************************************/
+int GenAlgo::RouletteWheelSelection(INDIVIDUAL const * Popu, Fitness RunningFITNESS, int min, int max)
+{
+	int i;
+	Fitness sum = 0.0,
+			fitness_indx = 0.0;
+
+	fitness_indx = FLOAT_RANDOM(0, RunningFITNESS);
+
+	for (i = 0; i < max; i++)
+	{
+		sum += Popu[i].fFitness;
+		if (sum > fitness_indx) break;
+	}
+
+	return i;	
 }
 
 /*************************************************************************/
@@ -775,7 +812,8 @@ bool GenAlgo::Run(const int func_no)
 		totGen,
 		indx_f = 0,				//Index of one parent.	
 		indx_m = 0;				//Index of another parent.
-	bool rslt ,
+	bool rslt,
+		 cross_frm_tables = false,
 		 itsTime = false;		//flag to indicate the start of our algo
 	
 
@@ -813,10 +851,10 @@ bool GenAlgo::Run(const int func_no)
 
 
 			/*SELECT PARENTS*/
-			GetParents(&indx_f, &indx_m , itsTime);
+			GetParents(&indx_f, &indx_m, itsTime, &cross_frm_tables);
 
 			/*DO CROSSOVER*/
-			CreateChildren(child1, child2, &indx_f, &indx_m , itsTime);
+			CreateChildren(child1, child2, &indx_f, &indx_m, itsTime, &cross_frm_tables);
 
 			/*MUTATES THE CHILDREN*/
 			MutateChildren(child1);
@@ -882,10 +920,10 @@ bool GenAlgo::ShowStatistics()
 
 bool GenAlgo::ShowIndividual(INDIVIDUAL const &individual)
 {
-	for (int j = 0; j < nVAR; j++)
+	/*for (int j = 0; j < nVAR; j++)
 	{
 		std::cout << "Var " << j << " : " << DecodeString(individual.fChromo, j) << " " << std::endl;
-	}
+	}*/
 	std::cout << "Fittness : " << individual.fFitness << std::endl;
 	std::cout << "\n Optimum Fittness : " << optimum << std::endl;
 	return SUCCESS;

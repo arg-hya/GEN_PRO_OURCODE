@@ -71,8 +71,8 @@ private:
 	bool InputParams();
 	bool Initialize();
 	Fitness CalculateFitness(INDIVIDUAL const &individual);
-	bool GetParents(int *indx_f, int *indx_m , const bool itsTime);
-	bool CreateChildren(INDIVIDUAL & child1, INDIVIDUAL & child2, const int *indx_f, const int *indx_m, const bool itsTime);
+	bool GetParents(int *indx_f, int *indx_m, const bool itsTime, bool *cross_frm_tables);
+	bool CreateChildren(INDIVIDUAL & child1, INDIVIDUAL & child2, const int *indx_f, const int *indx_m, const bool itsTime, bool *cross_frm_tables);
 	bool MutateChildren(INDIVIDUAL & child1);
 	bool IdentifyChilds(INDIVIDUAL const & child1, INDIVIDUAL const & child2, const int indx_f, const int indx_m, int const indx);
 	bool CopyPopulation(int gen_no);
@@ -85,6 +85,7 @@ private:
 	double DecodeString(char * fChromo , const int i);
 	int largestPowerOf2(const unsigned int n);
 	bool BetterFit(const double fit_target, const double fit_base);
+	int RouletteWheelSelection(INDIVIDUAL const * Popu, Fitness RunningFITNESS, int min, int max);
 
 	bool ShowPopu();
 	bool ShowDude();

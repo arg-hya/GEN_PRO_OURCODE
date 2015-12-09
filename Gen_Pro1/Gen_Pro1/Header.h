@@ -9,7 +9,7 @@
 
 #define RANDOM(min, max)  min + rand() % (max - min + 1) //range : [min, max] . Seeding done in constructor. [INTEGER]
 
-#define FLOAT_RANDOM(min, max)  min + (rand() / ( double(RAND_MAX) / (max -min )))  //range : [min, max] . Seeding done in constructor.[DOUBLE]
+#define FLOAT_RANDOM(min, max)  min + (rand() / ( double(RAND_MAX) / (max + 1 -min )))  //range : [min, max] . Seeding done in constructor.[DOUBLE]
 #define square(x)  ((x)*(x))
 #define mod(x)  (x<0)? -x : x;
 
