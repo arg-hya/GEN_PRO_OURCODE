@@ -85,8 +85,7 @@ private:
 	double DecodeString(char * fChromo , const int i);
 	int largestPowerOf2(const unsigned int n);
 	bool BetterFit(const double fit_target, const double fit_base);
-	int RouletteWheelSelection(INDIVIDUAL const * Popu, Fitness RunningFITNESS, int min, int max);
-
+	int RouletteWheelSelection(INDIVIDUAL const * Popu, Fitness Start, Fitness End, int Popu_size);
 	bool ShowPopu();
 	bool ShowDude();
 	bool ShowIndividual(INDIVIDUAL const &individual);

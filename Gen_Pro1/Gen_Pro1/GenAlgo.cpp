@@ -269,12 +269,12 @@ bool GenAlgo::GetParents(int *indx_f, int *indx_m , const bool itsTime , bool *c
 	else
 	{
 		*cross_frm_tables = false;
-		*indx_m = RouletteWheelSelection(POPU, avgRunningFITNESS * nPOPU, 0, nPOPU - 1);		//RANDOM(0, nPOPU - 1);
+		*indx_m = RouletteWheelSelection(POPU, 0.0 , avgRunningFITNESS * nPOPU, nPOPU - 1);		//RANDOM(0, nPOPU - 1);
 	}	
 
 	while (1)
 	{
-		*indx_f = RouletteWheelSelection(POPU, avgRunningFITNESS * nPOPU, 0, nPOPU - 1);  //RANDOM(0, nPOPU - 1);
+		*indx_f = RouletteWheelSelection(POPU, 0.0, avgRunningFITNESS * nPOPU, nPOPU - 1);  //RANDOM(0, nPOPU - 1);
 		if ((!itsTime) ||
 			(false == *cross_frm_tables)
 			)
@@ -774,19 +774,19 @@ bool GenAlgo::CalculateAvgFitness()
 ///
 /// \param  
 ///
-/// \return		Returns decoded string
+/// \return		Returns index of the selected individual
 ///
-/// \remarks	Calculates the running average of the current population.
+/// \remarks	Roulette Wheel Selection is done.
 /*************************************************************************/
-int GenAlgo::RouletteWheelSelection(INDIVIDUAL const * Popu, Fitness RunningFITNESS, int min, int max)
+int GenAlgo::RouletteWheelSelection(INDIVIDUAL const * Popu, Fitness Start, Fitness End, int Popu_size)
 {
 	int i;
 	Fitness sum = 0.0,
 			fitness_indx = 0.0;
 
-	fitness_indx = FLOAT_RANDOM(0, RunningFITNESS);
+	fitness_indx = FLOAT_RANDOM(Start, End);
 
-	for (i = 0; i < max; i++)
+	for (i = 0; i < Popu_size; i++)
 	{
 		sum += Popu[i].fFitness;
 		if (sum > fitness_indx) break;
