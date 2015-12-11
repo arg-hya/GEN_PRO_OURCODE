@@ -65,6 +65,7 @@ int _tmain(int argc, _TCHAR* argv[])
 		std::cout << "************ Function number: " << i + 1 << " ************" << std::endl;
 
 		OptimumValue(i + 1, optimum);
+		//OptimumValue(1, optimum);
 
 		GenAlgo *a = new GenAlgo();		
 
@@ -75,11 +76,12 @@ int _tmain(int argc, _TCHAR* argv[])
 		a->optimum = optimum;
 
 		a->Run(i+1);			//Runs it
+		//a->Run(1);			//Runs it
 
 		a->~GenAlgo();		//Delete it
 	}
 
-	getchar();
+	//getchar();
 
 	return 0;
 }

@@ -13,7 +13,7 @@
 /*************************************************************************/
 GenAlgo::GenAlgo()
 {	
-	srand((unsigned int)time(NULL));	// initialize random seed	
+	srand((unsigned int)time(NULL));	// initialize random seed		
 
 	Minimizing_prob = false;
 
@@ -151,7 +151,9 @@ bool GenAlgo::InputParams()
 	//std::cout << "\nMutation Probability ? ( 0 to 1 ) -- : ";	
 	////std::cin >> Pm;
 	Pm = 0.2;
-	Ptb = 0.6;
+
+	Ptb_xb = 0.6;
+	Ptb_e = 0.6;
 	//std::cout << "\nNumber of variables (Maximum %d) ---- : " << MAXVECSIZE;
 	nVAR = 10;
 	//std::cin >> nVAR;
@@ -256,25 +258,42 @@ bool GenAlgo::Initialize()
 /// \remarks	This function randomly selects two different parents from the population
 ///             and stores their locations in indx_m and indx_f respectively.
 /*************************************************************************/
-bool GenAlgo::GetParents(int *indx_f, int *indx_m , const bool itsTime , bool *cross_frm_tables)
+bool GenAlgo::GetParents(int *indx_f, int *indx_m, const bool itsTime, byte *cross_frm_tables)
 {
-	double 	bCrossTables = 0.0;		//decides whether to populate from the tables
-	bCrossTables = FLOAT_RANDOM(0, 1);
+	double 	bCrossTables_Pxb = 0.0,		//decides whether to populate from the Pxb Table.
+			bCrossTables_Pe = 0.0;		//decides whether to populate from the Pe Table.
+	
+	bCrossTables_Pxb = FLOAT_RANDOM(0, 1);
+	bCrossTables_Pe = FLOAT_RANDOM(0, 1);
 
-	if ((itsTime) && (bCrossTables <= Ptb))
+	*cross_frm_tables = PARENT_FROM_POPU;
+
+	if (itsTime)
 	{
-		*cross_frm_tables = true;
-		*indx_m = RANDOM(0, (T + D) - 1);
+		if (bCrossTables_Pxb <= Ptb_xb)
+		{
+			*cross_frm_tables = PARENT_FROM_PXB;
+			*indx_m = RANDOM(0, T  - 1);
+		}
+		else if (bCrossTables_Pe <= Ptb_e)
+		{
+			*cross_frm_tables = PARENT_FROM_PE;
+			*indx_m = RANDOM(0,  D - 1);
+		}
 	}
-	else
-	{
-		*cross_frm_tables = false;
-		*indx_m = RouletteWheelSelection(POPU, 0.0 , avgRunningFITNESS * nPOPU, nPOPU - 1);		//RANDOM(0, nPOPU - 1);
+	if (PARENT_FROM_POPU == *cross_frm_tables)
+	{		
+		*indx_m = AboveAverageSelection(POPU, nPOPU);
+				  //RouletteWheelSelection(POPU, optimum, nPOPU);
+				 // RANDOM(0, nPOPU - 1);
 	}	
 
 	while (1)
 	{
-		*indx_f = RouletteWheelSelection(POPU, 0.0, avgRunningFITNESS * nPOPU, nPOPU - 1);  //RANDOM(0, nPOPU - 1);
+		*indx_f = AboveAverageSelection(POPU, nPOPU);
+				 //RouletteWheelSelection(POPU, optimum, nPOPU);
+				// RANDOM(0, nPOPU - 1);
+
 		if ((!itsTime) ||
 			(false == *cross_frm_tables)
 			)
@@ -297,7 +316,7 @@ bool GenAlgo::GetParents(int *indx_f, int *indx_m , const bool itsTime , bool *c
 ///				selecting a crossover point and then merging the parents w.r.t the selected point.
 /*************************************************************************/
 bool GenAlgo::CreateChildren(INDIVIDUAL & child1, INDIVIDUAL & child2,
-			  const int *indx_f, const int *indx_m, const bool itsTime, bool *cross_frm_tables)
+			  const int *indx_f, const int *indx_m, const bool itsTime, byte *cross_frm_tables)
 {
 	int crossPoint = 0,
 		i;
@@ -310,12 +329,14 @@ bool GenAlgo::CreateChildren(INDIVIDUAL & child1, INDIVIDUAL & child2,
 	if (bCrossover <= Pc)
 	{
 		//CrossOver and create children
-		if ((itsTime) && cross_frm_tables)
+		if ((itsTime) && 
+			((PARENT_FROM_PXB == *cross_frm_tables) || (PARENT_FROM_PE == *cross_frm_tables))	//One parent from tables
+			)
 		{			
-				int indx_tables = RANDOM(0, (T + D - 1));
-
-				const char *fChromo_table;
-				fChromo_table = (indx_tables < T) ? Pxb[indx_tables].fChromo : Pe[indx_tables - T].fChromo;
+			int indx_tables = *indx_m;	//indx_m contains the index from the table.//RANDOM(0, (T + D - 1));
+			
+			const char *fChromo_table;	//contains the chromo from the considered table
+			fChromo_table = (PARENT_FROM_PXB == *cross_frm_tables) ? Pxb[indx_tables].fChromo : Pe[indx_tables].fChromo;
 
 #if One_Point_Crossover 
 				for (i = 0; i <= crossPoint; i++)
@@ -331,7 +352,7 @@ bool GenAlgo::CreateChildren(INDIVIDUAL & child1, INDIVIDUAL & child2,
 				
 #endif
 		}
-		else
+		else   //No parent from tables
 		{
 #if One_Point_Crossover 
 			for (i = 0; i <= crossPoint; i++)
@@ -401,54 +422,34 @@ bool GenAlgo::MutateChildren(INDIVIDUAL & child)
 /*************************************************************************/
 bool GenAlgo::IdentifyChilds(INDIVIDUAL const & child1, INDIVIDUAL const & child2,
 							 const int indx_f, const int indx_m, int const indx)
-{
-	int i;
-	/*For Child 1*/
-	if (BetterFit(child1.fFitness, POPU[indx_f].fFitness) || BetterFit(child1.fFitness , POPU[indx_m].fFitness))
-	{
-		for (i = 0; i < lenChromo_tot; i++)
-			Temp_popu[indx].fChromo[i] = child1.fChromo[i];
-
-		Temp_popu[indx].fFitness = child1.fFitness;
-	}
-	else if (BetterFit(POPU[indx_f].fFitness, POPU[indx_m].fFitness))
-	{
-		for (i = 0; i < lenChromo_tot; i++)
-			Temp_popu[indx].fChromo[i] = POPU[indx_f].fChromo[i];
-
-		Temp_popu[indx].fFitness = POPU[indx_f].fFitness;
-	}
-	else
-	{
-		for (i = 0; i < lenChromo_tot; i++)
-			Temp_popu[indx].fChromo[i] = POPU[indx_m].fChromo[i];
-
-		Temp_popu[indx].fFitness = POPU[indx_m].fFitness;
-	}	
+{	int i;	
+	INDIVIDUAL Contestants[4] = { child1, child2, POPU[indx_f], POPU[indx_m] };		//Table of Contestants
 	
-
-	/*For Child 2*/
-	if (BetterFit(child2.fFitness, POPU[indx_f].fFitness) || BetterFit(child2.fFitness , POPU[indx_m].fFitness))
-	{
-		for (i = 0; i < lenChromo_tot; i++)
-			Temp_popu[indx + 1].fChromo[i] = child2.fChromo[i];
-
-		Temp_popu[indx + 1].fFitness = child2.fFitness;
+	int Indi1_idx = 0, Indi2_idx = 0;
+	for (i = 0; i < _countof(Contestants); i++)		//Finding the fittest individual indx
+	{		
+		if (BetterFit(Contestants[i].fFitness, Contestants[Indi1_idx].fFitness))	Indi1_idx = i;		
 	}
-	else if (BetterFit(POPU[indx_m].fFitness , POPU[indx_f].fFitness))
-	{
-		for (i = 0; i < lenChromo_tot; i++)
-			Temp_popu[indx + 1].fChromo[i] = POPU[indx_m].fChromo[i];
 
-		Temp_popu[indx + 1].fFitness = POPU[indx_m].fFitness;
-	}
-	else
+	for (i = 0; i < _countof(Contestants); i++)		//Finding the second fittest individual indx
 	{
-		for (i = 0; i < lenChromo_tot; i++)
-			Temp_popu[indx + 1].fChromo[i] = POPU[indx_f].fChromo[i];
-
-		Temp_popu[indx + 1].fFitness = POPU[indx_f].fFitness;
+		if (Indi1_idx != i)	//Both must not be the same individual
+		{
+			if (BetterFit(Contestants[i].fFitness, Contestants[Indi2_idx].fFitness))	Indi2_idx = i;
+		}		
 	}
+
+	/*Copying First individual*/
+	for (i = 0; i < lenChromo_tot; i++)
+		Temp_popu[indx].fChromo[i] = Contestants[Indi1_idx].fChromo[i];
+
+	Temp_popu[indx].fFitness = Contestants[Indi1_idx].fFitness;
+
+	/*Copying Second individual*/
+	for (i = 0; i < lenChromo_tot; i++)
+		Temp_popu[indx + 1].fChromo[i] = Contestants[Indi2_idx].fChromo[i];
+
+	Temp_popu[indx + 1].fFitness = Contestants[Indi2_idx].fFitness;
 
 	return SUCCESS;
 
@@ -778,21 +779,103 @@ bool GenAlgo::CalculateAvgFitness()
 ///
 /// \remarks	Roulette Wheel Selection is done.
 /*************************************************************************/
-int GenAlgo::RouletteWheelSelection(INDIVIDUAL const * Popu, Fitness Start, Fitness End, int Popu_size)
+int GenAlgo::RouletteWheelSelection(INDIVIDUAL const * Popu, Fitness Start, int Popu_size)
 {
 	int i;
 	Fitness sum = 0.0,
-			fitness_indx = 0.0;
-
-	fitness_indx = FLOAT_RANDOM(Start, End);
+			fitness_indx = 0.0,
+			mod_highest_fitness = 0.0,		//highest value of fittness encountered stored here [if (true == Minimizing_prob)]
+			End = 0.0 ;						//Range of rand, i.e	0  to Rand_Max
+	
+	if (true == Minimizing_prob)
+	{
+		for (i = 0; i < Popu_size; i++)
+			{		
+				if (mod_highest_fitness < (POPU[i].fFitness - Start))
+				{
+					mod_highest_fitness = POPU[i].fFitness - Start;		//shifting origin to 0
+				}					
+			}		
+	}
 
 	for (i = 0; i < Popu_size; i++)
 	{
-		sum += Popu[i].fFitness;
-		if (sum > fitness_indx) break;
+		if (true == Minimizing_prob)
+		{			
+			End += (mod_highest_fitness - (POPU[i].fFitness - Start));		
+		}
+		else
+		{
+			End += POPU[i].fFitness - Start;		
+		}
 	}
 
-	return i;	
+	fitness_indx = FLOAT_RANDOM(0.0, End);		//Range [0  to  Rand_max]
+
+	for (i = 0; i < Popu_size - 1; i++)
+	{
+		if (true == Minimizing_prob)
+		{			
+			sum += (mod_highest_fitness - (POPU[i].fFitness - Start));		//flipping fitness values in case of Minimizing_prob
+			if (sum > fitness_indx) break;
+		}
+		else
+		{
+			sum += (POPU[i].fFitness - Start);
+			if (sum > fitness_indx) break;
+		}		
+	}	
+
+	return i ;	
+}
+
+/*************************************************************************/
+/// <b>Function: AboveAverageSelection</b>
+///
+/// \param  
+///
+/// \return		Returns index of the selected individual
+///
+/// \remarks	Roulette Wheel Selection is done.
+/*************************************************************************/
+int GenAlgo::AboveAverageSelection(INDIVIDUAL const * Popu, int Popu_size)
+{
+	int i,
+		j = 0,
+		random_indx = 0,
+		indx = -1,
+		current_best_fit_indx = 0;
+	float corr = 0.0,
+		 tempcorr = 0.0;
+	  
+	
+	/*Finds the best fitness level achieved in this generation. */
+	//NOTE:: index can also be taken best_fitness_array[genNo], this loop is not required then
+	for (i = 0; i < Popu_size; i++)
+	{
+		if (BetterFit(POPU[i].fFitness, POPU[current_best_fit_indx].fFitness))	current_best_fit_indx = i;
+	}
+
+	do
+	{
+		j++;
+
+		random_indx = RANDOM(0, Popu_size - 1);
+		
+		if (BetterFit(POPU[random_indx].fFitness, avgRunningFITNESS))
+		{
+			tempcorr = CalCorrelationCoff(Popu[random_indx], Popu[current_best_fit_indx]);
+			if (tempcorr < corr)		//right now least correlated chromo is selected
+			{
+				corr = tempcorr;
+				indx = random_indx;
+			}
+
+		}	
+		
+	} while ((-1 != indx) && (j < Popu_size/2));
+
+	return random_indx;
 }
 
 /*************************************************************************/
@@ -812,8 +895,10 @@ bool GenAlgo::Run(const int func_no)
 		totGen,
 		indx_f = 0,				//Index of one parent.	
 		indx_m = 0;				//Index of another parent.
-	bool rslt,
-		 cross_frm_tables = false,
+
+	byte cross_frm_tables = PARENT_FROM_POPU;
+
+	bool rslt,		 
 		 itsTime = false;		//flag to indicate the start of our algo
 	
 

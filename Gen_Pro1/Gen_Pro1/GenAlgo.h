@@ -4,6 +4,8 @@
 #include <stdlib.h>     /* srand, rand */
 #include <time.h>       /* time */
 #include <math.h>       /* pow , sqrt  */
+#include <chrono>
+#include <random>
 
 class GenAlgo
 {
@@ -23,6 +25,8 @@ private:
 	typedef INDIVIDUAL *TABLE;			/* tables used */
 
 	typedef  double Fitness;   
+
+	typedef unsigned char    byte;
 
 	/*=================
 	GLOBAL VARIABLES :
@@ -46,7 +50,8 @@ private:
 			 *HG_BND,				//Lower Bound and Higher Bound of each variable.				 
 			  Pc ,					//Cross-Over Propability.
 		      Pm ,					//Mutation Propability.
-			  Ptb ,					//Crossover from Tables Propability.
+			  Ptb_xb,				//Crossover from Pxb Table Propability.
+			  Ptb_e,				//Crossover from Pe Table Propability.
 			  BASIC_SEED;			//basic seed for rand().
 			
 
@@ -71,8 +76,8 @@ private:
 	bool InputParams();
 	bool Initialize();
 	Fitness CalculateFitness(INDIVIDUAL const &individual);
-	bool GetParents(int *indx_f, int *indx_m, const bool itsTime, bool *cross_frm_tables);
-	bool CreateChildren(INDIVIDUAL & child1, INDIVIDUAL & child2, const int *indx_f, const int *indx_m, const bool itsTime, bool *cross_frm_tables);
+	bool GetParents(int *indx_f, int *indx_m, const bool itsTime, byte *cross_frm_tables);
+	bool CreateChildren(INDIVIDUAL & child1, INDIVIDUAL & child2, const int *indx_f, const int *indx_m, const bool itsTime, byte *cross_frm_tables);
 	bool MutateChildren(INDIVIDUAL & child1);
 	bool IdentifyChilds(INDIVIDUAL const & child1, INDIVIDUAL const & child2, const int indx_f, const int indx_m, int const indx);
 	bool CopyPopulation(int gen_no);
@@ -85,7 +90,10 @@ private:
 	double DecodeString(char * fChromo , const int i);
 	int largestPowerOf2(const unsigned int n);
 	bool BetterFit(const double fit_target, const double fit_base);
-	int RouletteWheelSelection(INDIVIDUAL const * Popu, Fitness Start, Fitness End, int Popu_size);
+
+	int RouletteWheelSelection(INDIVIDUAL const * Popu, Fitness Start, int Popu_size);
+	int AboveAverageSelection(INDIVIDUAL const * Popu, int Popu_size);
+
 	bool ShowPopu();
 	bool ShowDude();
 	bool ShowIndividual(INDIVIDUAL const &individual);
