@@ -212,7 +212,7 @@ bool GenAlgo::Initialize()
 	best_fitness_array = new Fitness[nGEN];
 
 	T = (int)(nGEN * 0.2);
-	D = (int)(nGEN * 0.1);
+	D = (int)(nGEN * 0.1);	//NOTE:: D should be always less than 2*T
 	
 	//Initializing tables
 	Pb = new INDIVIDUAL[T];
@@ -534,17 +534,32 @@ bool GenAlgo::PopulateTables(int indx)
 	/*Populating Pb end*/
 
 	/*Populating Pxb start*/
-	//Right now Pxb is selected dicrectly by coping a randomly selected individual from Pb
-	if (indx >= T)
+	//Right now Pxb is the average of Pb
+	if (indx >= T)	//Pb is full
 	{	
 		int indx_Pxb = RANDOM(0, T-1);
 
-		for (int j = 0; j < lenChromo_tot; j++)
+		for (int j = 0; j < lenChromo_tot; j++)	//Setting all the genes to zero.
 		{
 			Pxb[(indx % T)].fChromo[j] = 0;
 		}
 
-		for (int i = 0; i < indx_Pxb; i++)
+		//
+		int index = (indx % T);
+		for (int i = 0; i < nVAR; i++)
+		{			
+			double sum = 0.0;
+			for (int j = 0; j < indx_Pxb; j++)
+			{
+				sum += DecodeString(Pb[i].fChromo , i);	
+				
+			}
+			sum /= nVAR;
+			EncodeString(Pxb[index].fChromo, i, sum);
+		}
+		//
+
+		/*for (int i = 0; i < indx_Pxb; i++)
 		{
 			for (int j = 0; j < lenChromo_tot; j++)
 			{
@@ -555,8 +570,8 @@ bool GenAlgo::PopulateTables(int indx)
 		for (int j = 0; j < lenChromo_tot; j++)
 		{
 			Pxb[(indx % T)].fChromo[j] = Pxb[(indx % T)].fChromo[j] % 2;
-		}
-		Pxb[(indx % T)].fFitness = CalculateFitness(Pxb[(indx % T)]);// Pb[indx_Pxb].fFitness;		
+		}*/
+		Pxb[index].fFitness = CalculateFitness(Pxb[index]);// Pb[indx_Pxb].fFitness;		
 	}
 	/*Populating Pxb end*/
 
@@ -739,6 +754,45 @@ double GenAlgo::DecodeString(char * fChromo, const int i)
 
 	return result;
 		
+}
+
+/*************************************************************************/
+/// <b>Function: DecodeString</b>
+///
+/// \param  
+///
+/// \return		Returns decoded string
+///
+/// \remarks	 BCD to Binary conversion. [LSB...MSB]
+/*************************************************************************/
+bool GenAlgo::EncodeString(char * fChromo, const int i , double value)
+{
+	int temp = 0,
+		start = 0,
+		end = 0,
+		var_highest = (int)pow(2, lenChromo_var[i]);
+
+	double coff;		
+
+	for (int k = 0; k < i; k++)	start += lenChromo_var[k];
+
+	end = start + lenChromo_var[i];
+	
+	coff = (value - LW_BND[i]) / (HG_BND[i] - LW_BND[i]);
+	temp = (int)(coff *(double)var_highest);
+	
+
+	for (int j = start; j < end; j++)
+	{
+		if (temp & (1 << (j - start)))
+		{
+			fChromo[j] = 1;
+		}
+	}	
+
+
+	return SUCCESS;
+
 }
 
 /*************************************************************************/

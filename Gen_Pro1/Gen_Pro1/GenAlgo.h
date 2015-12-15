@@ -88,6 +88,7 @@ private:
 
 	bool CalculateAvgFitness();
 	double DecodeString(char * fChromo , const int i);
+	bool EncodeString(char * fChromo, const int i, double value);
 	int largestPowerOf2(const unsigned int n);
 	bool BetterFit(const double fit_target, const double fit_base);
 
