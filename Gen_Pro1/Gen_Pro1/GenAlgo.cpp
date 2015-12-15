@@ -153,7 +153,7 @@ bool GenAlgo::InputParams()
 	Pm = 0.2;
 
 	Ptb_xb = 0.6;
-	Ptb_e = 0.6;
+	Ptb_e = 0.5;
 	//std::cout << "\nNumber of variables (Maximum %d) ---- : " << MAXVECSIZE;
 	nVAR = 10;
 	//std::cin >> nVAR;
@@ -243,6 +243,14 @@ bool GenAlgo::Initialize()
 		Pe[i].fChromo = new char[lenChromo_tot];
 	}
 
+
+	/*Populating Xi start*/
+	for (int j = 0; j < nVAR; j++)
+	{
+		Xi[j] = 0.50;   // Initially Xi is set ro 0.5. i.e every variable is equally important.
+	}
+	/*Populating Xi end*/
+
 	return SUCCESS;
 	
 }
@@ -285,14 +293,14 @@ bool GenAlgo::GetParents(int *indx_f, int *indx_m, const bool itsTime, byte *cro
 	{		
 		*indx_m = AboveAverageSelection(POPU, nPOPU);
 				  //RouletteWheelSelection(POPU, optimum, nPOPU);
-				 // RANDOM(0, nPOPU - 1);
+				 //RANDOM(0, nPOPU - 1);
 	}	
 
 	while (1)
 	{
 		*indx_f = AboveAverageSelection(POPU, nPOPU);
 				 //RouletteWheelSelection(POPU, optimum, nPOPU);
-				// RANDOM(0, nPOPU - 1);
+				//RANDOM(0, nPOPU - 1);
 
 		if ((!itsTime) ||
 			(false == *cross_frm_tables)
@@ -501,14 +509,16 @@ bool GenAlgo::CopyPopulation(int gen_no)
 bool GenAlgo::PopulateTables(int indx)
 {
 	int idx_Pb = 0;				//Stores the current best candidate indx
-	float maxFittness = POPU[0].fFitness;
+	float maxFittness = POPU[0].fFitness;	
 
 	/*Populating Xi start*/
+	//NOTE:: Every generation starts with a fresh value of Xi[].
 	for (int j = 0; j < nVAR; j++)
 	{
 		Xi[j] = 0.50;   // Initially Xi is set ro 0.5. i.e every variable is equally important.
 	}
 	/*Populating Xi end*/
+
 
 	/*Populating Pb start*/
 	for (int i = 0; i < nPOPU; i++)
@@ -527,12 +537,26 @@ bool GenAlgo::PopulateTables(int indx)
 	//Right now Pxb is selected dicrectly by coping a randomly selected individual from Pb
 	if (indx >= T)
 	{	
-		int indx_Pxb = RANDOM(0 , T-1);
+		int indx_Pxb = RANDOM(0, T-1);
+
 		for (int j = 0; j < lenChromo_tot; j++)
 		{
-			Pxb[(indx % T)].fChromo[j] = Pb[indx_Pxb].fChromo[j];   // copies the chromosome string to Pe and discards the oldest if indx > D-1 .
+			Pxb[(indx % T)].fChromo[j] = 0;
 		}
-		Pxb[(indx % T)].fFitness = Pb[indx_Pxb].fFitness;
+
+		for (int i = 0; i < indx_Pxb; i++)
+		{
+			for (int j = 0; j < lenChromo_tot; j++)
+			{
+				Pxb[(indx % T)].fChromo[j] += Pb[i].fChromo[j];
+			}	
+
+		}
+		for (int j = 0; j < lenChromo_tot; j++)
+		{
+			Pxb[(indx % T)].fChromo[j] = Pxb[(indx % T)].fChromo[j] % 2;
+		}
+		Pxb[(indx % T)].fFitness = CalculateFitness(Pxb[(indx % T)]);// Pb[indx_Pxb].fFitness;		
 	}
 	/*Populating Pxb end*/
 
@@ -587,33 +611,53 @@ int GenAlgo::FindLeastCorrelatedCandidate(const int idx_Pb)
 /// \return		Returns True\False
 ///
 /// \remarks	Copies population from temp population to new population.
+///				"indv_main" is the base and "indv_obj" is the comparable
 /*************************************************************************/
 float GenAlgo::CalCorrelationCoff(INDIVIDUAL const & indv_main, INDIVIDUAL const & indv_obj)
 {
-	double corr = 0.0 , diff = 0 , norm_diff , norm_diff_fitness , factor , rms = 0.0;
-
-	norm_diff_fitness = mod(indv_main.fFitness - indv_obj.fFitness);		//though it is always greater than 1
-	norm_diff_fitness /= avgRunningFITNESS;
+	double corr = 0.0, diff = 0, norm_diff, norm_diff_fitness, factor = -1, rms_square = 0.0, mod_highest_fitness = 0.0;
+	
+	/*for (int i = 0; i < nPOPU; i++)
+	{
+		if (mod_highest_fitness < POPU[i].fFitness)
+		{
+			mod_highest_fitness = POPU[i].fFitness;		
+		}
+	}	*/
+	norm_diff_fitness = mod((indv_main.fFitness - indv_obj.fFitness));		
+	//norm_diff_fitness /= mod((mod_highest_fitness - optimum));
 	
 	for (int i = 0; i < nVAR; i++)
 	{
+		
 		/*Calcualting Correlation Coefficient*/
-		diff = (DecodeString(indv_main.fChromo, i) - DecodeString(indv_obj.fChromo, i));
-		corr += Xi[i] * square(diff);  // copies the chromosome string from temp population to new population.
-		rms += square(diff);		
+		diff = mod((DecodeString(indv_main.fChromo, i) - DecodeString(indv_obj.fChromo, i)));
+		corr += Xi[i] * square(diff);  
+		rms_square += square(diff);
 
-		/*Updating Xi table*/	
-		norm_diff = diff / (HG_BND[i] - LW_BND[i]);
-		factor = norm_diff / norm_diff_fitness;
+		/*Updating Xi table*/
+		if (0 != norm_diff_fitness)	//division by zero considered 2)
+		{
+			norm_diff = diff;// / (HG_BND[i] - LW_BND[i]);
+			factor = norm_diff / norm_diff_fitness;
+		}
 
-		if (factor > 1)	Xi[i] += ((1 - Xi[i]) / 2);
-		else	Xi[i] -= (Xi[i] / 2);
+		/*NOTE:: if factor is -1, then the fitness values are equal.*
+		*In this case we are not changing the weight of the variable*/
+		if (-1 != factor)	
+		{
+			if (factor < 1)	Xi[i] += ((1 - Xi[i]) / pow(2, factor ));
+			else
+			{				
+				Xi[i] -= (Xi[i] / pow(2, (1 / factor)));
+			}
+		}		
 	}
 
-	corr /= rms;
+	corr /= rms_square;
 	corr = sqrt(corr);
 
-	return corr;
+	return (1 - corr);
 }
 
 /*************************************************************************/
@@ -836,7 +880,9 @@ int GenAlgo::RouletteWheelSelection(INDIVIDUAL const * Popu, Fitness Start, int 
 ///
 /// \return		Returns index of the selected individual
 ///
-/// \remarks	Roulette Wheel Selection is done.
+/// \remarks	Randomly selects a candidate whose fitness is above the average fitness, then finds its 
+///				correlation coff. w.r.t the best candidate. Returns the highest correlated candidate's index.
+///				No of iterations done is  Popu_size / 8
 /*************************************************************************/
 int GenAlgo::AboveAverageSelection(INDIVIDUAL const * Popu, int Popu_size)
 {
@@ -864,8 +910,8 @@ int GenAlgo::AboveAverageSelection(INDIVIDUAL const * Popu, int Popu_size)
 		
 		if (BetterFit(POPU[random_indx].fFitness, avgRunningFITNESS))
 		{
-			tempcorr = CalCorrelationCoff(Popu[random_indx], Popu[current_best_fit_indx]);
-			if (tempcorr < corr)		//right now least correlated chromo is selected
+			tempcorr = CalCorrelationCoff(Popu[current_best_fit_indx], Popu[random_indx]);			
+			if (tempcorr > corr)		//more correlation with the best candidate the better
 			{
 				corr = tempcorr;
 				indx = random_indx;
@@ -873,9 +919,9 @@ int GenAlgo::AboveAverageSelection(INDIVIDUAL const * Popu, int Popu_size)
 
 		}	
 		
-	} while ((-1 != indx) && (j < Popu_size/2));
+	} while (j < Popu_size/8);
 
-	return random_indx;
+	return (indx != -1) ? indx : RANDOM(0 , Popu_size - 1);
 }
 
 /*************************************************************************/
@@ -966,6 +1012,7 @@ bool GenAlgo::Run(const int func_no)
 
 		/*POPULATE TABLES*/
 		PopulateTables(nGEN - totGen);
+		Fitness_Calculations++;
 
 		/*std::cout << "\nGen no :: " << nGEN - totGen << std::endl;
 		std::cout << "**************" << std::endl;*/

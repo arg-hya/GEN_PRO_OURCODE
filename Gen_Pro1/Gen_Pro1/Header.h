@@ -17,7 +17,7 @@
 
 #define FLOAT_RANDOM(min, max)  min + (rand() / ( double(RAND_MAX) / (max - min )))  //range : [min, max] . Seeding done in constructor.[DOUBLE]
 #define square(x)  ((x)*(x))
-#define mod(x)  (x<0)? -x : x;
+#define mod(x)  (x<0.0)? (-1 * x) : (x);
 
 const double epsilon = pow(10.0, -8);
 
