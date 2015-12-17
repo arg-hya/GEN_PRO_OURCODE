@@ -9,9 +9,12 @@
 #define MAXPOPSIZE	1000
 #define MINPOPSIZE	2
 
-#define PARENT_FROM_POPU	0
-#define PARENT_FROM_PXB		1
-#define PARENT_FROM_PE		2
+/*PARENT SELECTION FLAGS START*/
+#define PARENT_FROM_POPU	0	//parents are from the main population
+#define PARENT_FROM_PXB		1	//one parent is from the PXB population
+#define PARENT_FROM_PE		2	//one parent is from the PE population
+/*PARENT SELECTION FLAGS START*/
+
 
 #define RANDOM(min, max)  min + rand() % (max - min + 1) //range : [min, max] . Seeding done in constructor. [INTEGER]
 

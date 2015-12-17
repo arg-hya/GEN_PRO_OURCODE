@@ -150,10 +150,10 @@ bool GenAlgo::InputParams()
 	Pc = 0.9;
 	//std::cout << "\nMutation Probability ? ( 0 to 1 ) -- : ";	
 	////std::cin >> Pm;
-	Pm = 0.2;
+	Pm = 0.01;
 
 	Ptb_xb = 0.6;
-	Ptb_e = 0.5;
+	Ptb_e = 0.05;
 	//std::cout << "\nNumber of variables (Maximum %d) ---- : " << MAXVECSIZE;
 	nVAR = 10;
 	//std::cin >> nVAR;
@@ -263,7 +263,7 @@ bool GenAlgo::Initialize()
 ///
 /// \return		Returns True\False
 ///
-/// \remarks	This function randomly selects two different parents from the population
+/// \remarks	This function selects two different parents from the population
 ///             and stores their locations in indx_m and indx_f respectively.
 /*************************************************************************/
 bool GenAlgo::GetParents(int *indx_f, int *indx_m, const bool itsTime, byte *cross_frm_tables)
@@ -278,15 +278,20 @@ bool GenAlgo::GetParents(int *indx_f, int *indx_m, const bool itsTime, byte *cro
 
 	if (itsTime)
 	{
-		if (bCrossTables_Pxb <= Ptb_xb)
+		/*if (bCrossTables_Pxb <= Ptb_xb)
 		{
 			*cross_frm_tables = PARENT_FROM_PXB;
 			*indx_m = RANDOM(0, T  - 1);
-		}
-		else if (bCrossTables_Pe <= Ptb_e)
+		}*/
+		 if (bCrossTables_Pe <= Ptb_e)
 		{
 			*cross_frm_tables = PARENT_FROM_PE;
 			*indx_m = RANDOM(0,  D - 1);
+		}
+		else if (bCrossTables_Pxb <= Ptb_xb)
+		{
+			*cross_frm_tables = PARENT_FROM_PXB;
+			*indx_m = RANDOM(0, T - 1);
 		}
 	}
 	if (PARENT_FROM_POPU == *cross_frm_tables)
@@ -330,7 +335,7 @@ bool GenAlgo::CreateChildren(INDIVIDUAL & child1, INDIVIDUAL & child2,
 		i;
 	double bCrossover = 0.0;		//decides if crossover should take place	   
 	
-	bCrossover = FLOAT_RANDOM(0, 1);   //rand() % 2  ;	//mod2 random number generation	
+	bCrossover = FLOAT_RANDOM(0, 1);   	//generating random real number [0,1]	
 
 	crossPoint = RANDOM(0, lenChromo_tot - 1);	
 	 
@@ -378,7 +383,7 @@ bool GenAlgo::CreateChildren(INDIVIDUAL & child1, INDIVIDUAL & child2,
 	}
 	else   //Crossover is not taking place
 	{
-		for (i = 0; i < lenChromo_tot; i++)
+		for (i = 0; i < lenChromo_tot; i++)	//Copying parent chromo into child chromo
 		{
 			child1.fChromo[i] = POPU[*indx_f].fChromo[i];
 			child2.fChromo[i] = POPU[*indx_m].fChromo[i];
@@ -397,22 +402,33 @@ bool GenAlgo::CreateChildren(INDIVIDUAL & child1, INDIVIDUAL & child2,
 ///
 /// \return		Returns True\False
 ///
-/// \remarks	This function /*first verifies if the child is to be mutated by choosing a random mod2 number then*/
-///				randomly selects a mutation point and flips the value at that position.
+/// \remarks	This function mutates the offspring at each locus with probability Pm (the mutation rate).
 /*************************************************************************/
 bool GenAlgo::MutateChildren(INDIVIDUAL & child)
 {
-	int mutationPoint = 0;
+	int mutationPoint = 0 , i;
 	//	i;
 	double bmutate = 0.0;			//decides if the child should be mutated
 
-	bmutate = FLOAT_RANDOM(0, 1); // rand() % 2;	//mod2 random number generation
+	//bmutate = FLOAT_RANDOM(0, 1); // rand() % 2;	//mod2 random number generation
 
-	if (bmutate <= Pm)
+	//if (bmutate <= Pm)
+	//{
+	//	mutationPoint = RANDOM(0, lenChromo_tot - 1);	//selects a random mutation point		
+
+	//	child.fChromo[mutationPoint] = (child.fChromo[mutationPoint] + 1) % 2;	//fliping the value
+	//}
+
+	for (i = 0; i < lenChromo_tot; i++)
 	{
-		mutationPoint = RANDOM(0, lenChromo_tot - 1);	//selects a random mutation point		
+		bmutate = FLOAT_RANDOM(0, 1); // rand() % 2;	//mod2 random number generation
 
-		child.fChromo[mutationPoint] = (child.fChromo[mutationPoint] + 1) % 2;	//fliping the value
+		if (bmutate <= Pm)
+		{
+			//mutationPoint = RANDOM(0, lenChromo_tot - 1);	//selects a random mutation point		
+
+			child.fChromo[i] = (child.fChromo[i] + 1) % 2;	//fliping the value
+		}
 	}
 	return SUCCESS;
 
@@ -511,19 +527,19 @@ bool GenAlgo::PopulateTables(int indx)
 	int idx_Pb = 0;				//Stores the current best candidate indx
 	float maxFittness = POPU[0].fFitness;	
 
-	/*Populating Xi start*/
+	/**********Populating Xi start**********/
 	//NOTE:: Every generation starts with a fresh value of Xi[].
 	for (int j = 0; j < nVAR; j++)
 	{
 		Xi[j] = 0.50;   // Initially Xi is set ro 0.5. i.e every variable is equally important.
 	}
-	/*Populating Xi end*/
+	/**********Populating Xi end**********/
 
 
-	/*Populating Pb start*/
+	/**********Populating Pb start**********/
 	for (int i = 0; i < nPOPU; i++)
 	{
-		if (BetterFit(POPU[i].fFitness , maxFittness))	idx_Pb = i;
+		if (BetterFit(POPU[i].fFitness , maxFittness))	idx_Pb = i;	//finding the current best candidate
 	}
 
 	for (int j = 0; j < lenChromo_tot; j++)
@@ -531,58 +547,43 @@ bool GenAlgo::PopulateTables(int indx)
 		Pb[(indx % T)].fChromo[j] = POPU[idx_Pb].fChromo[j];   // copies the chromosome string to Pb and discards the oldest if indx > T-1 .
 	}
 	Pb[(indx % T)].fFitness = POPU[idx_Pb].fFitness;
-	/*Populating Pb end*/
+	/**********Populating Pb end**********/
 
-	/*Populating Pxb start*/
+	/**********Populating Pxb start**********/
 	//Right now Pxb is the average of Pb
 	if (indx >= T)	//Pb is full
 	{	
-		int indx_Pxb = RANDOM(0, T-1);
+		//int indx_Pxb = RANDOM(0, T-1);
+		int index = (indx % T);
 
 		for (int j = 0; j < lenChromo_tot; j++)	//Setting all the genes to zero.
 		{
-			Pxb[(indx % T)].fChromo[j] = 0;
-		}
-
-		//
-		int index = (indx % T);
+			Pxb[index].fChromo[j] = 0;
+		}		
 		for (int i = 0; i < nVAR; i++)
-		{			
-			double sum = 0.0;
-			for (int j = 0; j < indx_Pxb; j++)
-			{
-				sum += DecodeString(Pb[i].fChromo , i);	
-				
-			}
-			sum /= nVAR;
-			EncodeString(Pxb[index].fChromo, i, sum);
-		}
-		//
-
-		/*for (int i = 0; i < indx_Pxb; i++)
 		{
-			for (int j = 0; j < lenChromo_tot; j++)
-			{
-				Pxb[(indx % T)].fChromo[j] += Pb[i].fChromo[j];
-			}	
+			double numerator_sum = 0.0, denom_sum = 0.0;
+			int ran_indx = RANDOM(0, T - 2);
 
+			numerator_sum = ((Pb[ran_indx].fFitness - optimum)*(DecodeString(Pb[ran_indx].fChromo, i))) + ((Pb[ran_indx + 1].fFitness - optimum)*(DecodeString(Pb[ran_indx + 1].fChromo, i)));
+			denom_sum = (Pb[ran_indx].fFitness - optimum) + (Pb[ran_indx + 1].fFitness - optimum);
+			numerator_sum /= denom_sum;			
+
+			EncodeString(Pxb[index].fChromo, i, numerator_sum);
 		}
-		for (int j = 0; j < lenChromo_tot; j++)
-		{
-			Pxb[(indx % T)].fChromo[j] = Pxb[(indx % T)].fChromo[j] % 2;
-		}*/
-		Pxb[index].fFitness = CalculateFitness(Pxb[index]);// Pb[indx_Pxb].fFitness;		
+
+		Pxb[index].fFitness = CalculateFitness(Pxb[index]);
 	}
-	/*Populating Pxb end*/
+	/**********Populating Pxb end**********/
 
-	/*Populating Pe start*/
+	/*********Populating Pe start**********/
 	int indx_Pe = FindLeastCorrelatedCandidate(idx_Pb);
 	for (int j = 0; j < lenChromo_tot; j++)
 	{
 		Pe[(indx % D)].fChromo[j] = POPU[indx_Pe].fChromo[j];   // copies the chromosome string to Pe and discards the oldest if indx > D-1 .
 	}
 	Pe[(indx % D)].fFitness = POPU[indx_Pe].fFitness;
-	/*Populating Pe end*/	
+	/**********Populating Pe end**********/	
 
 	return SUCCESS;
 }
@@ -1074,7 +1075,7 @@ bool GenAlgo::Run(const int func_no)
 
 	} while (--totGen);
 
-	ShowStatistics();
+	//ShowStatistics();
 
 	ShowDude();		
 
@@ -1124,7 +1125,7 @@ bool GenAlgo::ShowDude()
 		if (BetterFit(POPU[i].fFitness, POPU[max_fit_indx].fFitness))	max_fit_indx = i;
 	}
 	
-	std::cout << "\nDude is : " << std::endl;
+	//std::cout << "\nDude is : " << std::endl;
 	ShowIndividual(POPU[max_fit_indx]);
 	
 	return SUCCESS;
